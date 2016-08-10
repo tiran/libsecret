@@ -73,8 +73,9 @@ on_complete_get_result (GObject *source,
 }
 
 static void
-test_get_sync (Test *test,
-               gconstpointer data)
+_test_get_sync (Test *test,
+               gconstpointer data,
+               SecretServiceFlags flags)
 {
 	SecretService *service1;
 	SecretService *service2;
@@ -83,10 +84,10 @@ test_get_sync (Test *test,
 
 	/* Both these sohuld point to the same thing */
 
-	service1 = secret_service_get_sync (SECRET_SERVICE_NONE, NULL, &error);
+	service1 = secret_service_get_sync (flags, NULL, &error);
 	g_assert_no_error (error);
 
-	service2 = secret_service_get_sync (SECRET_SERVICE_NONE, NULL, &error);
+	service2 = secret_service_get_sync (flags, NULL, &error);
 	g_assert_no_error (error);
 	g_object_add_weak_pointer (G_OBJECT (service2), (gpointer *)&service2);
 
@@ -101,7 +102,7 @@ test_get_sync (Test *test,
 	g_assert (service2 == NULL);
 
 	/* Services were disconnected, so this should create a new one */
-	service3 = secret_service_get_sync (SECRET_SERVICE_NONE, NULL, &error);
+	service3 = secret_service_get_sync (flags, NULL, &error);
 	g_assert (SECRET_IS_SERVICE (service3));
 	g_assert_no_error (error);
 	g_object_add_weak_pointer (G_OBJECT (service3), (gpointer *)&service3);
@@ -116,8 +117,23 @@ test_get_sync (Test *test,
 }
 
 static void
-test_get_async (Test *test,
-                gconstpointer data)
+test_get_sync (Test *test,
+               gconstpointer data)
+{
+	_test_get_sync(test, data, SECRET_SERVICE_NONE);
+}
+
+static void
+test_get_sync_systembus (Test *test,
+               gconstpointer data)
+{
+	_test_get_sync(test, data, SECRET_SERVICE_SYSTEM_BUS);
+}
+
+static void
+_test_get_async (Test *test,
+                gconstpointer data,
+                SecretServiceFlags flags)
 {
 	SecretService *service1;
 	SecretService *service2;
@@ -127,14 +143,14 @@ test_get_async (Test *test,
 
 	/* Both these sohuld point to the same thing */
 
-	secret_service_get (SECRET_SERVICE_NONE, NULL, on_complete_get_result, &result);
+	secret_service_get (flags, NULL, on_complete_get_result, &result);
 	g_assert (result == NULL);
 	egg_test_wait ();
 	service1 = secret_service_get_finish (result, &error);
 	g_assert_no_error (error);
 	g_clear_object (&result);
 
-	secret_service_get (SECRET_SERVICE_NONE, NULL, on_complete_get_result, &result);
+	secret_service_get (flags, NULL, on_complete_get_result, &result);
 	g_assert (result == NULL);
 	egg_test_wait ();
 	service2 = secret_service_get_finish (result, &error);
@@ -153,7 +169,7 @@ test_get_async (Test *test,
 	g_assert (service2 == NULL);
 
 	/* Services were unreffed, so this should create a new one */
-	secret_service_get (SECRET_SERVICE_NONE, NULL, on_complete_get_result, &result);
+	secret_service_get (flags, NULL, on_complete_get_result, &result);
 	g_assert (result == NULL);
 	egg_test_wait ();
 	service3 = secret_service_get_finish (result, &error);
@@ -164,6 +180,20 @@ test_get_async (Test *test,
 	g_object_unref (service3);
 	secret_service_disconnect ();
 	g_assert (service3 == NULL);
+}
+
+static void
+test_get_async (Test *test,
+                gconstpointer data)
+{
+	_test_get_async(test, data, SECRET_SERVICE_NONE);
+}
+
+static void
+test_get_async_systembus (Test *test,
+                gconstpointer data)
+{
+	_test_get_async(test, data, SECRET_SERVICE_SYSTEM_BUS);
 }
 
 static void
@@ -608,6 +638,9 @@ main (int argc, char **argv)
 	g_test_add ("/service/get-async", Test, "mock-service-normal.py", setup_mock, test_get_async, teardown_mock);
 	g_test_add ("/service/get-more-sync", Test, "mock-service-normal.py", setup_mock, test_get_more_sync, teardown_mock);
 	g_test_add ("/service/get-more-async", Test, "mock-service-normal.py", setup_mock, test_get_more_async, teardown_mock);
+
+	g_test_add ("/service/get-sync-systembus", Test, "mock-service-systembus.py", setup_mock, test_get_sync_systembus, teardown_mock);
+	g_test_add ("/service/get-async-systembus", Test, "mock-service-systembus.py", setup_mock, test_get_async_systembus, teardown_mock);
 
 	g_test_add ("/service/open-sync", Test, "mock-service-normal.py", setup_mock, test_open_sync, teardown_mock);
 	g_test_add ("/service/open-async", Test, "mock-service-normal.py", setup_mock, test_open_async, teardown_mock);

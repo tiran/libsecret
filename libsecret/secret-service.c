@@ -101,9 +101,15 @@
  *                               while initializing the #SecretService
  * @SECRET_SERVICE_LOAD_COLLECTIONS: load collections while initializing the
  *                                   #SecretService
+ * @SECRET_SERVICE_SESSION_BUS: connect #SecretService to session D-Bus
+ * @SECRET_SERVICE_SYSTEM_BUS: ignore SECRET_SERVICE_BUS_TYPE env var and
+ *                             connect #SecretService to system D-Bus
  *
  * Flags which determine which parts of the #SecretService proxy are initialized
- * during a secret_service_get() or secret_service_open() operation.
+ * during a secret_service_get() or secret_service_open() operation. In the
+ * absence of SECRET_SERVICE_SESSION_BUS and SECRET_SERVICE_SYSTEM_BUS
+ * libsecret checks the env var SECRET_SERVICE_BUS_TYPE and uses the system
+ * bus in case it is set to "system".
  */
 
 EGG_SECURE_DEFINE_GLIB_GLOBALS ();
@@ -756,6 +762,23 @@ get_default_bus_name (void)
 	return bus_name;
 }
 
+static GBusType
+get_bus_type(SecretServiceFlags flags)
+{
+	if (flags & SECRET_SERVICE_SESSION_BUS) {
+		return G_BUS_TYPE_SESSION;
+	} else if (flags & SECRET_SERVICE_SYSTEM_BUS) {
+		return G_BUS_TYPE_SYSTEM;
+	} else {
+		const gchar *bus_type;
+
+		bus_type = g_getenv ("SECRET_SERVICE_BUS_TYPE");
+		if (bus_type != NULL && g_str_equal(bus_type, "system"))
+			return G_BUS_TYPE_SYSTEM;
+	}
+	return G_BUS_TYPE_SESSION;
+}
+
 /**
  * secret_service_get:
  * @flags: flags for which service functionality to ensure is initialized
@@ -790,7 +813,7 @@ secret_service_get (SecretServiceFlags flags,
 		                            "g-flags", G_DBUS_PROXY_FLAGS_NONE,
 		                            "g-interface-info", _secret_gen_service_interface_info (),
 		                            "g-name", get_default_bus_name (),
-		                            "g-bus-type", G_BUS_TYPE_SESSION,
+		                            "g-bus-type", get_bus_type (flags),
 		                            "g-object-path", SECRET_SERVICE_PATH,
 		                            "g-interface-name", SECRET_SERVICE_INTERFACE,
 		                            "flags", flags,
@@ -888,7 +911,7 @@ secret_service_get_sync (SecretServiceFlags flags,
 		                          "g-flags", G_DBUS_PROXY_FLAGS_NONE,
 		                          "g-interface-info", _secret_gen_service_interface_info (),
 		                          "g-name", get_default_bus_name (),
-		                          "g-bus-type", G_BUS_TYPE_SESSION,
+		                          "g-bus-type", get_bus_type (flags),
 		                          "g-object-path", SECRET_SERVICE_PATH,
 		                          "g-interface-name", SECRET_SERVICE_INTERFACE,
 		                          "flags", flags,

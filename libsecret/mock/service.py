@@ -466,8 +466,11 @@ class SecretService(dbus.service.Object):
 		"dh-ietf1024-sha256-aes128-cbc-pkcs7": AesAlgorithm(),
 	}
 
-	def __init__(self):
-		self.bus = dbus.SessionBus()
+	def __init__(self, systembus=False):
+		if systembus:
+			self.bus = dbus.SystemBus()
+		else:
+			self.bus = dbus.SessionBus()
 		dbus.service.Object.__init__(self, self.bus, '/org/freedesktop/secrets')
 		self.sessions = { }
 		self.prompts = { }
